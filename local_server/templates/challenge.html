@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ entry.display_name }} — LeetGPU Local</title>
+<!-- KaTeX for LaTeX rendering -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<!-- CodeMirror 5 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a2e; color: #e0e0e0;
+    display: flex; flex-direction: column;
+  }
+  /* Header */
+  .header {
+    background: #16213e; padding: 10px 20px; border-bottom: 1px solid #333;
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  }
+  .header a { color: #fff; text-decoration: none; font-size: 18px; font-weight: 700; }
+  .header .badge { background: #0f3460; color: #4cc9f0; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+  .header .challenge-name { color: #ccc; font-size: 15px; margin-left: 8px; }
+  .diff-badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 600;
+  }
+  .diff-badge.easy { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .diff-badge.medium { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .diff-badge.hard { background: rgba(248,113,113,0.15); color: #f87171; }
+  .header .nav { margin-left: auto; display: flex; gap: 8px; }
+  .header .nav a {
+    color: #888; font-size: 13px; padding: 4px 10px; border-radius: 4px;
+    background: #0f3460; text-decoration: none;
+  }
+  .header .nav a:hover { color: #fff; }
+
+  /* Main layout */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* Left panel — description */
+  .desc-panel {
+    width: 45%; min-width: 300px; overflow-y: auto; padding: 24px;
+    border-right: 1px solid #333; background: #1a1a2e;
+  }
+  .desc-panel h2 { font-size: 17px; color: #fff; margin: 20px 0 10px; }
+  .desc-panel p { line-height: 1.7; margin-bottom: 12px; color: #ccc; }
+  .desc-panel ul { margin-left: 20px; margin-bottom: 12px; }
+  .desc-panel li { line-height: 1.6; color: #ccc; margin-bottom: 4px; }
+  .desc-panel pre {
+    background: #0d1117; border: 1px solid #333; border-radius: 6px;
+    padding: 12px 16px; font-size: 13px; overflow-x: auto; margin: 8px 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace; color: #e0e0e0;
+  }
+  .desc-panel code {
+    background: #2a2a4a; padding: 1px 5px; border-radius: 3px; font-size: 13px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace; color: #4cc9f0;
+  }
+  .desc-panel pre code { background: none; padding: 0; }
+  .desc-panel svg { max-width: 100%; }
+
+  /* Right panel */
+  .right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Editor */
+  .editor-container { flex: 1; overflow: hidden; position: relative; }
+  #editor { height: 100%; }
+  .CodeMirror { height: 100% !important; font-size: 14px; font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; }
+
+  /* Button bar */
+  .btn-bar {
+    display: flex; gap: 8px; padding: 8px 12px; background: #16213e;
+    border-top: 1px solid #333; border-bottom: 1px solid #333; flex-shrink: 0;
+  }
+  .btn {
+    padding: 6px 20px; border: none; border-radius: 4px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-run { background: #2563eb; color: #fff; }
+  .btn-run:hover:not(:disabled) { background: #3b82f6; }
+  .btn-submit { background: #16a34a; color: #fff; }
+  .btn-submit:hover:not(:disabled) { background: #22c55e; }
+  .btn-reset { background: #333; color: #ccc; margin-left: auto; }
+  .btn-reset:hover:not(:disabled) { background: #444; }
+
+  /* Console */
+  .console-container {
+    height: 220px; min-height: 100px; overflow-y: auto; background: #0d1117;
+    border-top: 1px solid #333; flex-shrink: 0;
+  }
+  .console-header {
+    padding: 6px 12px; background: #161b22; border-bottom: 1px solid #333;
+    font-size: 12px; color: #888; font-weight: 600;
+  }
+  #console {
+    padding: 10px 14px; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px; line-height: 1.5; white-space: pre-wrap; color: #ccc;
+  }
+  .pass { color: #4ade80; }
+  .fail { color: #f87171; }
+  .info { color: #60a5fa; }
+  .warn { color: #fbbf24; }
+  .dim { color: #666; }
+
+  /* Resizers */
+  .h-resizer {
+    width: 4px; background: #333; cursor: col-resize; flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .h-resizer:hover { background: #4cc9f0; }
+  .v-resizer {
+    height: 4px; background: #333; cursor: row-resize; flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .v-resizer:hover { background: #4cc9f0; }
+</style>
+</head>
+<body>
+  <script id="starter-code-json" type="application/json">{{ entry.starter_code | tojson }}</script>
+
+  <div class="header">
+    <a href="/">LeetGPU</a>
+    <span class="badge">LOCAL</span>
+    <span class="diff-badge {{ entry.difficulty }}">{{ entry.difficulty | capitalize }}</span>
+    <span class="challenge-name">{{ entry.number }}. {{ entry.display_name }}</span>
+    <div class="nav">
+      {% if prev_entry %}
+      <a href="/challenges/{{ prev_entry.slug }}">&larr; Prev</a>
+      {% endif %}
+      {% if next_entry %}
+      <a href="/challenges/{{ next_entry.slug }}">Next &rarr;</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Description panel -->
+    <div class="desc-panel" id="desc-panel">
+      {{ entry.description_html | safe }}
+    </div>
+
+    <!-- Horizontal resizer -->
+    <div class="h-resizer" id="h-resizer"></div>
+
+    <!-- Right panel: editor + console -->
+    <div class="right-panel">
+      <div class="editor-container">
+        <div id="editor"></div>
+      </div>
+      <div class="btn-bar">
+        <button class="btn btn-run" id="btn-run" onclick="runCode('run')">Run</button>
+        <button class="btn btn-submit" id="btn-submit" onclick="runCode('submit')">Submit</button>
+        <button class="btn btn-reset" onclick="resetCode()">Reset</button>
+      </div>
+      <div class="v-resizer" id="v-resizer"></div>
+      <div class="console-container" id="console-container">
+        <div class="console-header">Console</div>
+        <div id="console"><span class="dim">Click Run to compile and test your code.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SLUG = "{{ entry.slug }}";
+
+    // Initialize CodeMirror 5
+    const starterCode = JSON.parse(document.getElementById('starter-code-json').textContent);
+    const savedCode = localStorage.getItem('leetgpu_code_' + SLUG);
+    const cmEditor = CodeMirror(document.getElementById('editor'), {
+      value: savedCode || starterCode,
+      mode: 'text/x-c++src',
+      theme: 'material-darker',
+      lineNumbers: true,
+      matchBrackets: true,
+      autoCloseBrackets: true,
+      indentUnit: 4,
+      tabSize: 4,
+      indentWithTabs: false,
+      extraKeys: { 'Tab': function(cm) { cm.replaceSelection('    ', 'end'); } },
+    });
+    // Save to localStorage on change
+    cmEditor.on('change', () => {
+      localStorage.setItem('leetgpu_code_' + SLUG, cmEditor.getValue());
+    });
+    window.getCode = () => cmEditor.getValue();
+
+    // Auto-render KaTeX
+    document.addEventListener("DOMContentLoaded", () => {
+      if (typeof renderMathInElement === 'function') {
+        renderMathInElement(document.getElementById('desc-panel'), {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '$', right: '$', display: false},
+          ],
+          throwOnError: false,
+        });
+      }
+    });
+
+    // Horizontal resizer (left/right panels)
+    const hResizer = document.getElementById('h-resizer');
+    const descPanel = document.getElementById('desc-panel');
+    let hResizing = false;
+    hResizer.addEventListener('mousedown', () => {
+      hResizing = true;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    // Vertical resizer (editor/console)
+    const vResizer = document.getElementById('v-resizer');
+    const consoleContainer = document.getElementById('console-container');
+    let vResizing = false;
+    vResizer.addEventListener('mousedown', () => {
+      vResizing = true;
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (hResizing) {
+        const newWidth = e.clientX;
+        if (newWidth > 200 && newWidth < window.innerWidth - 300) {
+          descPanel.style.width = newWidth + 'px';
+        }
+      }
+      if (vResizing) {
+        const rightPanel = document.querySelector('.right-panel');
+        const rect = rightPanel.getBoundingClientRect();
+        const newConsoleHeight = rect.bottom - e.clientY;
+        if (newConsoleHeight > 60 && newConsoleHeight < rect.height - 100) {
+          consoleContainer.style.height = newConsoleHeight + 'px';
+        }
+      }
+    });
+    document.addEventListener('mouseup', () => {
+      hResizing = false;
+      vResizing = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    });
+
+    // Run / Submit
+    async function runCode(action) {
+      const code = window.getCode ? window.getCode() : '';
+      const con = document.getElementById('console');
+      const btnRun = document.getElementById('btn-run');
+      const btnSubmit = document.getElementById('btn-submit');
+
+      btnRun.disabled = true;
+      btnSubmit.disabled = true;
+      con.innerHTML = '<span class="info">Compiling...</span>\n';
+
+      try {
+        const resp = await fetch(`/api/challenges/${SLUG}/${action}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({code}),
+        });
+        const data = await resp.json();
+
+        if (data.error && !data.compilation) {
+          con.innerHTML += `<span class="fail">Error: ${esc(data.error)}</span>\n`;
+          return;
+        }
+
+        if (!data.compilation.success) {
+          con.innerHTML = '<span class="fail">Compilation FAILED</span>\n\n';
+          con.innerHTML += `<span class="dim">${esc(data.compilation.stderr)}</span>`;
+          return;
+        }
+
+        con.innerHTML = '<span class="pass">Compilation OK</span>\n';
+        if (data.compilation.stderr) {
+          con.innerHTML += `<span class="warn">${esc(data.compilation.stderr)}</span>\n`;
+        }
+
+        if (data.error) {
+          con.innerHTML += `\n<span class="fail">Runtime Error:\n${esc(data.error)}</span>\n`;
+          return;
+        }
+
+        const tests = data.tests || [];
+        const funcTests = tests.filter(t => !t.is_performance);
+        const perfTests = tests.filter(t => t.is_performance);
+
+        if (funcTests.length > 0) {
+          con.innerHTML += `\n<span class="info">Running ${funcTests.length} functional tests...</span>\n`;
+          for (const t of funcTests) {
+            if (t.passed) {
+              con.innerHTML += `  <span class="pass">Test ${t.index}/${tests.length}: PASSED</span> <span class="dim">(${t.time_ms}ms)</span>\n`;
+            } else {
+              con.innerHTML += `  <span class="fail">Test ${t.index}/${tests.length}: FAILED</span>`;
+              if (t.error) con.innerHTML += ` <span class="dim">— ${esc(t.error)}</span>`;
+              con.innerHTML += '\n';
+            }
+          }
+        }
+
+        if (perfTests.length > 0) {
+          con.innerHTML += `\n<span class="info">Running performance test...</span>\n`;
+          for (const t of perfTests) {
+            if (t.passed) {
+              con.innerHTML += `  <span class="pass">Performance: PASSED</span> <span class="dim">(${t.time_ms}ms)</span>\n`;
+            } else {
+              con.innerHTML += `  <span class="fail">Performance: FAILED</span>`;
+              if (t.error) con.innerHTML += ` <span class="dim">— ${esc(t.error)}</span>`;
+              con.innerHTML += '\n';
+            }
+          }
+        }
+
+        const passed = tests.filter(t => t.passed).length;
+        const total = tests.length;
+        con.innerHTML += `\n<span class="${passed === total ? 'pass' : 'fail'}">Result: ${passed}/${total} tests passed</span>\n`;
+
+        if (data.all_passed) {
+          const save = confirm('All tests passed! Save solution?');
+          if (save) {
+            const saveResp = await fetch(`/api/challenges/${SLUG}/save`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({code}),
+            });
+            const saveData = await saveResp.json();
+            if (saveData.saved) {
+              con.innerHTML += `<span class="pass">Solution saved to ${esc(saveData.saved)}</span>\n`;
+            }
+          }
+        }
+
+      } catch (e) {
+        con.innerHTML += `<span class="fail">Request failed: ${esc(e.message)}</span>\n`;
+      } finally {
+        btnRun.disabled = false;
+        btnSubmit.disabled = false;
+      }
+    }
+
+    function resetCode() {
+      if (!confirm('Reset code to starter template?')) return;
+      localStorage.removeItem('leetgpu_code_' + SLUG);
+      cmEditor.setValue(JSON.parse(document.getElementById('starter-code-json').textContent));
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>

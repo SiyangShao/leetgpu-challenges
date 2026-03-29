@@ -1,0 +1,13 @@
+[project]
+name = "leetgpu-local"
+version = "0.1.0"
+description = "Local LeetGPU server for running CUDA challenges"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0",
+    "numpy<2",
+    "torch>=2.0",
+]
+
+[project.scripts]
+leetgpu-local = "server:app"
