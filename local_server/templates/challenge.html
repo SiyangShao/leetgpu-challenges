@@ -512,8 +512,8 @@
         const allPassed = data.all_passed;
         con.innerHTML += `\n<span class="${passed === total ? 'pass' : 'fail'}">Result: ${passed}/${total} tests passed</span>\n`;
 
-        // Save to history
-        addHistoryEntry(code, action, tests, allPassed);
+        // Save to history (submit only)
+        if (action === 'submit') addHistoryEntry(code, action, tests, allPassed);
 
 
       } catch (e) {
