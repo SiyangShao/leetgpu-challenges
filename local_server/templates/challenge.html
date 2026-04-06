@@ -112,6 +112,74 @@
   .warn { color: #fbbf24; }
   .dim { color: #666; }
 
+  /* Custom modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-box {
+    background: #1e2340; border: 1px solid #444; border-radius: 10px;
+    padding: 24px 28px; min-width: 340px; max-width: 480px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .modal-box .modal-msg { color: #e0e0e0; font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+  .modal-box .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-box .modal-btn {
+    padding: 7px 20px; border: none; border-radius: 5px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: background 0.15s;
+  }
+  .modal-btn-ok { background: #2563eb; color: #fff; }
+  .modal-btn-ok:hover { background: #3b82f6; }
+  .modal-btn-cancel { background: #333; color: #ccc; }
+  .modal-btn-cancel:hover { background: #444; }
+
+  /* History panel */
+  .history-panel {
+    display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 520px;
+    background: #16213e; border-left: 1px solid #333; z-index: 900;
+    flex-direction: column; box-shadow: -4px 0 20px rgba(0,0,0,0.4);
+  }
+  .history-panel.open { display: flex; }
+  .history-panel .hp-header {
+    padding: 14px 20px; border-bottom: 1px solid #333; display: flex;
+    align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .history-panel .hp-header h3 { color: #fff; font-size: 15px; margin: 0; }
+  .hp-close {
+    background: none; border: none; color: #888; font-size: 20px; cursor: pointer;
+    padding: 2px 8px; border-radius: 4px;
+  }
+  .hp-close:hover { color: #fff; background: #333; }
+  .hp-list { flex: 1; overflow-y: auto; padding: 12px; }
+  .hp-empty { color: #666; text-align: center; padding: 40px 20px; font-size: 13px; }
+  .hp-item {
+    background: #1a1a2e; border: 1px solid #333; border-radius: 8px;
+    padding: 12px 14px; margin-bottom: 10px; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .hp-item:hover { border-color: #4cc9f0; }
+  .hp-item .hp-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; font-size: 12px;
+  }
+  .hp-item .hp-time { color: #888; }
+  .hp-item .hp-result { font-weight: 600; }
+  .hp-item .hp-result.passed { color: #4ade80; }
+  .hp-item .hp-result.failed { color: #f87171; }
+  .hp-item .hp-stats { font-size: 12px; color: #888; }
+  .hp-item .hp-stats span { margin-right: 12px; }
+  .hp-item .hp-runtime { color: #60a5fa; }
+  .hp-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .hp-actions button {
+    padding: 3px 10px; border: none; border-radius: 3px; font-size: 11px;
+    cursor: pointer; font-weight: 600;
+  }
+  .hp-btn-load { background: #2563eb; color: #fff; }
+  .hp-btn-load:hover { background: #3b82f6; }
+  .hp-btn-del { background: #333; color: #888; }
+  .hp-btn-del:hover { background: #444; color: #f87171; }
+
   /* Resizers */
   .h-resizer {
     width: 4px; background: #333; cursor: col-resize; flex-shrink: 0;
@@ -160,6 +228,7 @@
       <div class="btn-bar">
         <button class="btn btn-run" id="btn-run" onclick="runCode('run')">Run</button>
         <button class="btn btn-submit" id="btn-submit" onclick="runCode('submit')">Submit</button>
+        <button class="btn btn-reset" onclick="toggleHistory()" style="background:#0f3460;color:#4cc9f0;">History</button>
         <button class="btn btn-reset" onclick="resetCode()">Reset</button>
       </div>
       <div class="v-resizer" id="v-resizer"></div>
@@ -168,6 +237,26 @@
         <div id="console"><span class="dim">Click Run to compile and test your code.</span></div>
       </div>
     </div>
+  </div>
+
+  <!-- Custom modal -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-msg" id="modal-msg"></div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
+        <button class="modal-btn modal-btn-ok" id="modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History panel -->
+  <div class="history-panel" id="history-panel">
+    <div class="hp-header">
+      <h3>Submission History</h3>
+      <button class="hp-close" onclick="toggleHistory()">&times;</button>
+    </div>
+    <div class="hp-list" id="hp-list"></div>
   </div>
 
   <script>
@@ -252,6 +341,102 @@
       document.body.style.userSelect = '';
     });
 
+    // Custom modal (replaces browser confirm)
+    function showModal(msg) {
+      return new Promise((resolve) => {
+        const overlay = document.getElementById('modal-overlay');
+        document.getElementById('modal-msg').textContent = msg;
+        overlay.classList.add('active');
+        const ok = document.getElementById('modal-ok');
+        const cancel = document.getElementById('modal-cancel');
+        function cleanup(result) {
+          overlay.classList.remove('active');
+          ok.replaceWith(ok.cloneNode(true));
+          cancel.replaceWith(cancel.cloneNode(true));
+          resolve(result);
+        }
+        document.getElementById('modal-ok').addEventListener('click', () => cleanup(true));
+        document.getElementById('modal-cancel').addEventListener('click', () => cleanup(false));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+      });
+    }
+
+    // Submission history
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem('leetgpu_history_' + SLUG) || '[]'); }
+      catch { return []; }
+    }
+    function saveHistory(entries) {
+      localStorage.setItem('leetgpu_history_' + SLUG, JSON.stringify(entries));
+    }
+    function addHistoryEntry(code, action, tests, allPassed) {
+      const entries = getHistory();
+      const totalTime = tests.reduce((s, t) => s + (t.time_ms || 0), 0);
+      const perfTest = tests.find(t => t.is_performance);
+      entries.unshift({
+        ts: Date.now(),
+        action: action,
+        code: code,
+        passed: tests.filter(t => t.passed).length,
+        total: tests.length,
+        allPassed: allPassed,
+        totalTimeMs: Math.round(totalTime * 1000) / 1000,
+        perfTimeMs: perfTest ? perfTest.time_ms : null,
+      });
+      if (entries.length > 50) entries.length = 50;
+      saveHistory(entries);
+    }
+
+    function toggleHistory() {
+      const panel = document.getElementById('history-panel');
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) renderHistory();
+    }
+
+    function renderHistory() {
+      const list = document.getElementById('hp-list');
+      const entries = getHistory();
+      if (entries.length === 0) {
+        list.innerHTML = '<div class="hp-empty">No submissions yet.<br>Run or Submit your code to see history here.</div>';
+        return;
+      }
+      list.innerHTML = entries.map((e, i) => {
+        const d = new Date(e.ts);
+        const time = d.toLocaleString();
+        const label = e.action === 'submit' ? 'Submit' : 'Run';
+        const cls = e.allPassed ? 'passed' : 'failed';
+        const resultText = e.allPassed ? 'All Passed' : `${e.passed}/${e.total} passed`;
+        const perfInfo = e.perfTimeMs != null ? `<span class="hp-runtime">perf: ${e.perfTimeMs}ms</span>` : '';
+        return `<div class="hp-item">
+          <div class="hp-meta">
+            <span class="hp-time">${esc(time)} (${label})</span>
+            <span class="hp-result ${cls}">${resultText}</span>
+          </div>
+          <div class="hp-stats">
+            <span>Total: ${e.totalTimeMs}ms</span>${perfInfo}
+          </div>
+          <div class="hp-actions">
+            <button class="hp-actions button hp-btn-load" onclick="loadHistoryEntry(${i})">Load Code</button>
+            <button class="hp-actions button hp-btn-del" onclick="deleteHistoryEntry(${i})">Delete</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function loadHistoryEntry(idx) {
+      const entries = getHistory();
+      if (entries[idx]) {
+        cmEditor.setValue(entries[idx].code);
+      }
+    }
+
+    function deleteHistoryEntry(idx) {
+      const entries = getHistory();
+      entries.splice(idx, 1);
+      saveHistory(entries);
+      renderHistory();
+    }
+
     // Run / Submit
     async function runCode(action) {
       const code = window.getCode ? window.getCode() : '';
@@ -324,10 +509,14 @@
 
         const passed = tests.filter(t => t.passed).length;
         const total = tests.length;
+        const allPassed = data.all_passed;
         con.innerHTML += `\n<span class="${passed === total ? 'pass' : 'fail'}">Result: ${passed}/${total} tests passed</span>\n`;
 
-        if (data.all_passed) {
-          const save = confirm('All tests passed! Save solution?');
+        // Save to history
+        addHistoryEntry(code, action, tests, allPassed);
+
+        if (allPassed) {
+          const save = await showModal('All tests passed! Save solution to disk?');
           if (save) {
             const saveResp = await fetch(`/api/challenges/${SLUG}/save`, {
               method: 'POST',
@@ -349,8 +538,8 @@
       }
     }
 
-    function resetCode() {
-      if (!confirm('Reset code to starter template?')) return;
+    async function resetCode() {
+      if (!await showModal('Reset code to starter template?')) return;
       localStorage.removeItem('leetgpu_code_' + SLUG);
       cmEditor.setValue(JSON.parse(document.getElementById('starter-code-json').textContent));
     }
