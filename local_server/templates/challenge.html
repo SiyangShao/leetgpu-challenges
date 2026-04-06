@@ -515,20 +515,6 @@
         // Save to history
         addHistoryEntry(code, action, tests, allPassed);
 
-        if (allPassed) {
-          const save = await showModal('All tests passed! Save solution to disk?');
-          if (save) {
-            const saveResp = await fetch(`/api/challenges/${SLUG}/save`, {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({code}),
-            });
-            const saveData = await saveResp.json();
-            if (saveData.saved) {
-              con.innerHTML += `<span class="pass">Solution saved to ${esc(saveData.saved)}</span>\n`;
-            }
-          }
-        }
 
       } catch (e) {
         con.innerHTML += `<span class="fail">Request failed: ${esc(e.message)}</span>\n`;

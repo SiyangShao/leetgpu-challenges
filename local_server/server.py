@@ -316,25 +316,6 @@ def api_submit(slug):
     return _handle_execution(slug, "all")
 
 
-@app.route("/api/challenges/<slug>/save", methods=["POST"])
-def api_save(slug):
-    from datetime import datetime
-
-    entry = REGISTRY.get(slug)
-    if not entry:
-        return jsonify({"error": "Challenge not found"}), 404
-
-    data = request.get_json()
-    code = data.get("code", "")
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    sol_dir = os.path.join(entry["dir_path"], "solution")
-    os.makedirs(sol_dir, exist_ok=True)
-    sol_file = os.path.join(sol_dir, f"solution_{ts}.cu")
-    with open(sol_file, "w") as f:
-        f.write(code)
-    saved_path = os.path.relpath(sol_file, PROJECT_ROOT)
-    return jsonify({"saved": saved_path})
-
 
 def _handle_execution(slug, test_type):
     entry = REGISTRY.get(slug)

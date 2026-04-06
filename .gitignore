@@ -69,3 +69,6 @@ env/
 **/*.pyc
 **/*.pyo
 **/*.pyd
+
+# Local solutions
+**/solution/
