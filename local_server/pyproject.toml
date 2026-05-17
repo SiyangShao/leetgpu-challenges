@@ -9,5 +9,10 @@ dependencies = [
     "torch>=2.0",
 ]
 
+[project.optional-dependencies]
+# Runpod Flash backend — for Macs (or any host) with no local CUDA.
+# Install with:  uv sync --extra remote   (or pip install -e .[remote])
+remote = ["runpod-flash>=1.11"]
+
 [project.scripts]
 leetgpu-local = "server:app"

@@ -63,12 +63,19 @@ vcpkg_installed/
 
 # env
 env/
+.venv/
 
 # python
 **/__pycache__/
 **/*.pyc
 **/*.pyo
 **/*.pyd
+
+# runpod-flash build artifacts (artifact.tar.gz, flash_manifest.json, logs/)
+.flash/
+
+# Claude Code per-user settings (keep .claude/settings.json shared)
+.claude/settings.local.json
 
 # Local solutions
 **/solution/

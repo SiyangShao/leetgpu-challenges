@@ -8,19 +8,16 @@ Usage:
     # Open http://localhost:5000
 """
 
-import ctypes
 import importlib.util
-import json
-import multiprocessing as mp
 import os
 import re
 import subprocess
 import sys
-import tempfile
-import time
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
+
+from backend import Backend, get_backend
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -115,170 +112,9 @@ def discover_challenges():
 
 
 # ---------------------------------------------------------------------------
-# CUDA compilation
+# Backend (local nvcc / remote runpod-flash) — chosen via LEETGPU_BACKEND env
 # ---------------------------------------------------------------------------
-def compile_cuda(code: str, work_dir: str) -> tuple:
-    src = os.path.join(work_dir, "solution.cu")
-    so = os.path.join(work_dir, "solution.so")
-    with open(src, "w") as f:
-        f.write(code)
-
-    result = subprocess.run(
-        ["nvcc", "-shared", "-Xcompiler", "-fPIC", "-o", so, src],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    if result.returncode != 0:
-        return False, result.stderr, None
-    return True, result.stderr, so
-
-
-# ---------------------------------------------------------------------------
-# Test execution (runs in subprocess for crash isolation)
-# ---------------------------------------------------------------------------
-def _execute_in_subprocess(challenge_dir: str, so_path: str, test_type: str, result_queue):
-    """Run inside a child process so segfaults don't kill the server."""
-    try:
-        import ctypes as ct
-
-        import torch
-
-        # Re-import challenge module
-        challenges_root = str(Path(challenge_dir).parent.parent)
-        if challenges_root not in sys.path:
-            sys.path.insert(0, challenges_root)
-
-        challenge_py = os.path.join(challenge_dir, "challenge.py")
-        spec = importlib.util.spec_from_file_location("challenge_mod", challenge_py)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        challenge_obj = mod.Challenge()
-
-        # Load compiled library
-        lib = ct.CDLL(so_path)
-
-        sig = challenge_obj.get_solve_signature()
-
-        # Generate test cases
-        if test_type == "functional":
-            test_cases = challenge_obj.generate_functional_test()
-        elif test_type == "performance":
-            test_cases = [challenge_obj.generate_performance_test()]
-        elif test_type == "example":
-            test_cases = [challenge_obj.generate_example_test()]
-        else:
-            test_cases = challenge_obj.generate_functional_test()
-            perf = challenge_obj.generate_performance_test()
-            test_cases.append(perf)
-
-        results = []
-        for i, test_case in enumerate(test_cases):
-            # Clone tensors for reference comparison
-            ref_case = {}
-            for param_name in sig:
-                val = test_case[param_name]
-                if isinstance(val, torch.Tensor):
-                    ref_case[param_name] = val.clone()
-                else:
-                    ref_case[param_name] = val
-
-            try:
-                # Build ctypes arguments
-                argtypes = []
-                call_args = []
-                for param_name, (ctype, direction) in sig.items():
-                    value = test_case[param_name]
-                    if issubclass(ctype, ct._Pointer):
-                        # Pointer type — value is a torch.Tensor
-                        ptr = ct.cast(ct.c_void_p(value.data_ptr()), ctype)
-                        argtypes.append(ctype)
-                        call_args.append(ptr)
-                    else:
-                        # Scalar type
-                        argtypes.append(ctype)
-                        call_args.append(ctype(int(value)))
-
-                solve_func = lib.solve
-                solve_func.argtypes = argtypes
-                solve_func.restype = None
-
-                # Run user's solve with timing
-                torch.cuda.synchronize()
-                t0 = time.perf_counter()
-                solve_func(*call_args)
-                torch.cuda.synchronize()
-                t1 = time.perf_counter()
-                user_time_ms = (t1 - t0) * 1000
-
-                # Run reference
-                challenge_obj.reference_impl(**ref_case)
-
-                # Compare output tensors
-                passed = True
-                error_msg = None
-                for param_name, (ctype, direction) in sig.items():
-                    if direction in ("out", "inout") and isinstance(
-                        test_case[param_name], torch.Tensor
-                    ):
-                        user_t = test_case[param_name]
-                        ref_t = ref_case[param_name]
-                        if not torch.allclose(
-                            user_t, ref_t, atol=challenge_obj.atol, rtol=challenge_obj.rtol
-                        ):
-                            diff = (user_t.float() - ref_t.float()).abs()
-                            max_diff = diff.max().item()
-                            max_idx = diff.argmax().item()
-                            passed = False
-                            error_msg = (
-                                f"Mismatch in '{param_name}': "
-                                f"max abs diff = {max_diff:.6e} at flat index {max_idx}, "
-                                f"expected {ref_t.flatten()[max_idx].item():.6f}, "
-                                f"got {user_t.flatten()[max_idx].item():.6f}"
-                            )
-                            break
-
-                is_perf = test_type == "all" and i == len(test_cases) - 1
-                results.append(
-                    {
-                        "index": i + 1,
-                        "passed": passed,
-                        "time_ms": round(user_time_ms, 3),
-                        "error": error_msg,
-                        "is_performance": test_type == "performance" or is_perf,
-                    }
-                )
-            except Exception as e:
-                results.append(
-                    {
-                        "index": i + 1,
-                        "passed": False,
-                        "time_ms": 0,
-                        "error": str(e),
-                        "is_performance": False,
-                    }
-                )
-
-        result_queue.put({"success": True, "results": results})
-    except Exception as e:
-        import traceback
-
-        result_queue.put({"success": False, "error": traceback.format_exc()})
-
-
-def execute_tests(challenge_dir: str, so_path: str, test_type: str, timeout: int = 120):
-    ctx = mp.get_context("spawn")
-    q = ctx.Queue()
-    p = ctx.Process(target=_execute_in_subprocess, args=(challenge_dir, so_path, test_type, q))
-    p.start()
-    p.join(timeout=timeout)
-    if p.is_alive():
-        p.terminate()
-        p.join(5)
-        return {"success": False, "error": f"Execution timed out ({timeout}s)"}
-    if q.empty():
-        return {"success": False, "error": "Process crashed (possible segfault in your CUDA code)"}
-    return q.get()
+BACKEND: Backend | None = None  # set in main()
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +152,26 @@ def api_submit(slug):
     return _handle_execution(slug, "all")
 
 
+@app.route("/api/challenges/<slug>/save", methods=["POST"])
+def api_save(slug):
+    from datetime import datetime
+
+    entry = REGISTRY.get(slug)
+    if not entry:
+        return jsonify({"error": "Challenge not found"}), 404
+
+    data = request.get_json()
+    code = data.get("code", "")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    sol_dir = os.path.join(entry["dir_path"], "solution")
+    os.makedirs(sol_dir, exist_ok=True)
+    sol_file = os.path.join(sol_dir, f"solution_{ts}.cu")
+    with open(sol_file, "w") as f:
+        f.write(code)
+    saved_path = os.path.relpath(sol_file, PROJECT_ROOT)
+    return jsonify({"saved": saved_path})
+
+
 
 def _handle_execution(slug, test_type):
     entry = REGISTRY.get(slug)
@@ -327,40 +183,12 @@ def _handle_execution(slug, test_type):
     if not code.strip():
         return jsonify({"error": "No code provided"}), 400
 
-    # Compile
-    work_dir = tempfile.mkdtemp(prefix="leetgpu_")
     try:
-        ok, stderr, so_path = compile_cuda(code, work_dir)
-        if not ok:
-            return jsonify(
-                {
-                    "compilation": {"success": False, "stderr": stderr},
-                    "tests": [],
-                }
-            )
-
-        # Execute tests in subprocess
-        result = execute_tests(entry["dir_path"], so_path, test_type)
-
-        if not result["success"]:
-            return jsonify(
-                {
-                    "compilation": {"success": True, "stderr": stderr},
-                    "tests": [],
-                    "error": result["error"],
-                }
-            )
-
-        tests = result["results"]
-        all_passed = all(t["passed"] for t in tests)
-
-        return jsonify(
-            {
-                "compilation": {"success": True, "stderr": stderr},
-                "tests": tests,
-                "all_passed": test_type == "all" and all_passed,
-            }
-        )
+        result = BACKEND.run(entry["dir_path"], code, test_type)
+        tests = result.get("tests", [])
+        all_passed = bool(tests) and all(t["passed"] for t in tests)
+        result["all_passed"] = test_type == "all" and all_passed
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -391,7 +219,18 @@ if __name__ == "__main__":
     parser.add_argument("--host", default=None, help="Bind address (default: 127.0.0.1 + tailscale)")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--unsafe", action="store_true", help="Bind to 0.0.0.0 (all interfaces)")
+    parser.add_argument(
+        "--remote",
+        action="store_true",
+        help="Run CUDA on a Runpod Flash GPU instead of local nvcc (sets LEETGPU_BACKEND=remote)",
+    )
     args = parser.parse_args()
+
+    if args.remote:
+        os.environ["LEETGPU_BACKEND"] = "remote"
+
+    BACKEND = get_backend()
+    print(f"Backend: {BACKEND.__class__.__name__}")
 
     print("Discovering challenges...")
     discover_challenges()

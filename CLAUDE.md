@@ -172,6 +172,27 @@ python scripts/run_challenge.py path/to/challenge_dir --language cuda --action r
 - **Submission limit**: You may only run this script **5 times per session**. Use submissions carefully — verify your challenge locally (imports, assertions, lint) before submitting.
 - **Workflow**: Write a CUDA solution in `solution/solution.cu`, run the script with `--action run` to validate, and only use `--action submit` when confident. Do not commit the solution file to the PR.
 
+## Local server (`local_server/`) — unlimited local testing
+
+A Flask UI for browsing challenges and iterating on solutions with **no submission limit**. Two interchangeable backends, selected at startup:
+
+| Backend  | Env / flag                          | Where CUDA runs |
+|----------|-------------------------------------|-----------------|
+| `local`  | default (or `LEETGPU_BACKEND=local`) | `nvcc` + `ctypes` in a spawned subprocess on this machine |
+| `remote` | `--remote` or `LEETGPU_BACKEND=remote` | A [Runpod Serverless](https://runpod.io) GPU via [`runpod-flash`](https://github.com/runpod/flash) — defined in `local_server/flash_worker.py` |
+
+**Use this when:** you need to iterate fast without hitting the 5-submission cap above. Both backends run the same test harness as `run_challenge.py`, just locally driven.
+
+**Use `run_challenge.py` for the final perf check** — the remote backend uses an `AMPERE_16` (RTX A4000-class) GPU, not T4, so its `time_ms` numbers don't match LeetGPU's grader.
+
+**Files of interest:**
+- `local_server/server.py` — Flask routes; `_handle_execution` dispatches to a `Backend`
+- `local_server/backend.py` — `LocalBackend` (subprocess), `RemoteBackend` (awaits the @Endpoint)
+- `local_server/flash_worker.py` — `@Endpoint` definition; **edits here require `cd local_server && uv run flash deploy`**
+- `local_server/start-mac.sh` — Mac one-liner: `uv sync --extra remote` + auto `flash login` / `flash deploy` if needed + launch UI on http://127.0.0.1:5050
+
+`challenge.py` source is shipped per-call to the remote worker, so editing challenges never needs a redeploy.
+
 ## Checklist
 
 Verify every item before submitting. This is the single source of truth — workflow prompts reference this section.
