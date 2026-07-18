@@ -1,554 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ entry.display_name }} — LeetGPU Local</title>
-<!-- KaTeX for LaTeX rendering -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-<!-- CodeMirror 5 -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/clike/clike.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; overflow: hidden; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #1a1a2e; color: #e0e0e0;
-    display: flex; flex-direction: column;
-  }
-  /* Header */
-  .header {
-    background: #16213e; padding: 10px 20px; border-bottom: 1px solid #333;
-    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
-  }
-  .header a { color: #fff; text-decoration: none; font-size: 18px; font-weight: 700; }
-  .header .badge { background: #0f3460; color: #4cc9f0; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
-  .header .challenge-name { color: #ccc; font-size: 15px; margin-left: 8px; }
-  .diff-badge {
-    font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 600;
-  }
-  .diff-badge.easy { background: rgba(74,222,128,0.15); color: #4ade80; }
-  .diff-badge.medium { background: rgba(251,191,36,0.15); color: #fbbf24; }
-  .diff-badge.hard { background: rgba(248,113,113,0.15); color: #f87171; }
-  .header .nav { margin-left: auto; display: flex; gap: 8px; }
-  .header .nav a {
-    color: #888; font-size: 13px; padding: 4px 10px; border-radius: 4px;
-    background: #0f3460; text-decoration: none;
-  }
-  .header .nav a:hover { color: #fff; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>{{ entry.number }}. {{ entry.display_name }} — LeetGPU Local</title>
 
-  /* Main layout */
-  .main { display: flex; flex: 1; overflow: hidden; }
-
-  /* Left panel — description */
-  .desc-panel {
-    width: 45%; min-width: 300px; overflow-y: auto; padding: 24px;
-    border-right: 1px solid #333; background: #1a1a2e;
-  }
-  .desc-panel h2 { font-size: 17px; color: #fff; margin: 20px 0 10px; }
-  .desc-panel p { line-height: 1.7; margin-bottom: 12px; color: #ccc; }
-  .desc-panel ul { margin-left: 20px; margin-bottom: 12px; }
-  .desc-panel li { line-height: 1.6; color: #ccc; margin-bottom: 4px; }
-  .desc-panel pre {
-    background: #0d1117; border: 1px solid #333; border-radius: 6px;
-    padding: 12px 16px; font-size: 13px; overflow-x: auto; margin: 8px 0;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace; color: #e0e0e0;
-  }
-  .desc-panel code {
-    background: #2a2a4a; padding: 1px 5px; border-radius: 3px; font-size: 13px;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace; color: #4cc9f0;
-  }
-  .desc-panel pre code { background: none; padding: 0; }
-  .desc-panel svg { max-width: 100%; }
-
-  /* Right panel */
-  .right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-  /* Editor */
-  .editor-container { flex: 1; overflow: hidden; position: relative; }
-  #editor { height: 100%; }
-  .CodeMirror { height: 100% !important; font-size: 14px; font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; }
-
-  /* Button bar */
-  .btn-bar {
-    display: flex; gap: 8px; padding: 8px 12px; background: #16213e;
-    border-top: 1px solid #333; border-bottom: 1px solid #333; flex-shrink: 0;
-  }
-  .btn {
-    padding: 6px 20px; border: none; border-radius: 4px; font-size: 13px;
-    font-weight: 600; cursor: pointer; transition: all 0.15s;
-  }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-run { background: #2563eb; color: #fff; }
-  .btn-run:hover:not(:disabled) { background: #3b82f6; }
-  .btn-submit { background: #16a34a; color: #fff; }
-  .btn-submit:hover:not(:disabled) { background: #22c55e; }
-  .btn-reset { background: #333; color: #ccc; margin-left: auto; }
-  .btn-reset:hover:not(:disabled) { background: #444; }
-
-  /* Console */
-  .console-container {
-    height: 220px; min-height: 100px; overflow-y: auto; background: #0d1117;
-    border-top: 1px solid #333; flex-shrink: 0;
-  }
-  .console-header {
-    padding: 6px 12px; background: #161b22; border-bottom: 1px solid #333;
-    font-size: 12px; color: #888; font-weight: 600;
-  }
-  #console {
-    padding: 10px 14px; font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 13px; line-height: 1.5; white-space: pre-wrap; color: #ccc;
-  }
-  .pass { color: #4ade80; }
-  .fail { color: #f87171; }
-  .info { color: #60a5fa; }
-  .warn { color: #fbbf24; }
-  .dim { color: #666; }
-
-  /* Custom modal */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-    z-index: 1000; align-items: center; justify-content: center;
-  }
-  .modal-overlay.active { display: flex; }
-  .modal-box {
-    background: #1e2340; border: 1px solid #444; border-radius: 10px;
-    padding: 24px 28px; min-width: 340px; max-width: 480px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  }
-  .modal-box .modal-msg { color: #e0e0e0; font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
-  .modal-box .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
-  .modal-box .modal-btn {
-    padding: 7px 20px; border: none; border-radius: 5px; font-size: 13px;
-    font-weight: 600; cursor: pointer; transition: background 0.15s;
-  }
-  .modal-btn-ok { background: #2563eb; color: #fff; }
-  .modal-btn-ok:hover { background: #3b82f6; }
-  .modal-btn-cancel { background: #333; color: #ccc; }
-  .modal-btn-cancel:hover { background: #444; }
-
-  /* History panel */
-  .history-panel {
-    display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 520px;
-    background: #16213e; border-left: 1px solid #333; z-index: 900;
-    flex-direction: column; box-shadow: -4px 0 20px rgba(0,0,0,0.4);
-  }
-  .history-panel.open { display: flex; }
-  .history-panel .hp-header {
-    padding: 14px 20px; border-bottom: 1px solid #333; display: flex;
-    align-items: center; justify-content: space-between; flex-shrink: 0;
-  }
-  .history-panel .hp-header h3 { color: #fff; font-size: 15px; margin: 0; }
-  .hp-close {
-    background: none; border: none; color: #888; font-size: 20px; cursor: pointer;
-    padding: 2px 8px; border-radius: 4px;
-  }
-  .hp-close:hover { color: #fff; background: #333; }
-  .hp-list { flex: 1; overflow-y: auto; padding: 12px; }
-  .hp-empty { color: #666; text-align: center; padding: 40px 20px; font-size: 13px; }
-  .hp-item {
-    background: #1a1a2e; border: 1px solid #333; border-radius: 8px;
-    padding: 12px 14px; margin-bottom: 10px; cursor: pointer;
-    transition: border-color 0.15s;
-  }
-  .hp-item:hover { border-color: #4cc9f0; }
-  .hp-item .hp-meta {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 6px; font-size: 12px;
-  }
-  .hp-item .hp-time { color: #888; }
-  .hp-item .hp-result { font-weight: 600; }
-  .hp-item .hp-result.passed { color: #4ade80; }
-  .hp-item .hp-result.failed { color: #f87171; }
-  .hp-item .hp-stats { font-size: 12px; color: #888; }
-  .hp-item .hp-stats span { margin-right: 12px; }
-  .hp-item .hp-runtime { color: #60a5fa; }
-  .hp-actions { display: flex; gap: 6px; margin-top: 8px; }
-  .hp-actions button {
-    padding: 3px 10px; border: none; border-radius: 3px; font-size: 11px;
-    cursor: pointer; font-weight: 600;
-  }
-  .hp-btn-load { background: #2563eb; color: #fff; }
-  .hp-btn-load:hover { background: #3b82f6; }
-  .hp-btn-del { background: #333; color: #888; }
-  .hp-btn-del:hover { background: #444; color: #f87171; }
-
-  /* Resizers */
-  .h-resizer {
-    width: 4px; background: #333; cursor: col-resize; flex-shrink: 0;
-    transition: background 0.15s;
-  }
-  .h-resizer:hover { background: #4cc9f0; }
-  .v-resizer {
-    height: 4px; background: #333; cursor: row-resize; flex-shrink: 0;
-    transition: background 0.15s;
-  }
-  .v-resizer:hover { background: #4cc9f0; }
-</style>
+  <!-- Challenge prose and editor dependencies. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/clike/clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/dialog/dialog.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/dialog/dialog.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/keymap/vim.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='local-ui.css') }}">
 </head>
-<body>
+<body class="challenge-page" data-slug="{{ entry.slug }}">
   <script id="starter-code-json" type="application/json">{{ entry.starter_code | tojson }}</script>
 
-  <div class="header">
-    <a href="/">LeetGPU</a>
-    <span class="badge">LOCAL</span>
-    <span class="diff-badge {{ entry.difficulty }}">{{ entry.difficulty | capitalize }}</span>
-    <span class="challenge-name">{{ entry.number }}. {{ entry.display_name }}</span>
-    <div class="nav">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Back to LeetGPU problems">
+      <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
+      <span class="brand-name">LeetGPU</span>
+    </a>
+    <span class="local-pill"><span class="status-dot" aria-hidden="true"></span>Local</span>
+    <div class="challenge-context" aria-label="Current challenge">
+      <span class="context-divider" aria-hidden="true">/</span>
+      <span class="challenge-crumb">{{ entry.number }}. {{ entry.display_name }}</span>
+    </div>
+    <nav class="challenge-nav" aria-label="Challenge navigation">
       {% if prev_entry %}
-      <a href="/challenges/{{ prev_entry.slug }}">&larr; Prev</a>
+      <a class="nav-button" href="/challenges/{{ prev_entry.slug }}" aria-label="Previous challenge: {{ prev_entry.display_name }}">
+        <span aria-hidden="true">←</span><span class="nav-button-label">Prev</span>
+      </a>
       {% endif %}
       {% if next_entry %}
-      <a href="/challenges/{{ next_entry.slug }}">Next &rarr;</a>
+      <a class="nav-button" href="/challenges/{{ next_entry.slug }}" aria-label="Next challenge: {{ next_entry.display_name }}">
+        <span class="nav-button-label">Next</span><span aria-hidden="true">→</span>
+      </a>
       {% endif %}
-    </div>
-  </div>
+    </nav>
+  </header>
 
-  <div class="main">
-    <!-- Description panel -->
-    <div class="desc-panel" id="desc-panel">
-      {{ entry.description_html | safe }}
-    </div>
+  <main class="workspace" id="workspace">
+    <section class="desc-panel panel" id="desc-panel" aria-labelledby="description-tab">
+      <header class="panel-heading">
+        <span class="panel-tab" id="description-tab"><span class="panel-icon" aria-hidden="true">¶</span>Description</span>
+      </header>
+      <article class="problem-content" id="problem-content">
+        <div class="problem-title-block">
+          <h1>{{ entry.number }}. {{ entry.display_name }}</h1>
+          <span class="difficulty-pill {{ entry.difficulty }}">{{ entry.difficulty | capitalize }}</span>
+        </div>
+        {{ entry.description_html | safe }}
+      </article>
+    </section>
 
-    <!-- Horizontal resizer -->
-    <div class="h-resizer" id="h-resizer"></div>
+    <div
+      class="h-resizer"
+      id="h-resizer"
+      role="separator"
+      tabindex="0"
+      aria-label="Resize problem description"
+      aria-orientation="vertical"
+      aria-valuemin="25"
+      aria-valuemax="70"
+      aria-valuenow="45"
+    ></div>
 
-    <!-- Right panel: editor + console -->
-    <div class="right-panel">
-      <div class="editor-container">
-        <div id="editor"></div>
-      </div>
-      <div class="btn-bar">
-        <button class="btn btn-run" id="btn-run" onclick="runCode('run')">Run</button>
-        <button class="btn btn-submit" id="btn-submit" onclick="runCode('submit')">Submit</button>
-        <button class="btn btn-reset" onclick="toggleHistory()" style="background:#0f3460;color:#4cc9f0;">History</button>
-        <button class="btn btn-reset" onclick="resetCode()">Reset</button>
-      </div>
-      <div class="v-resizer" id="v-resizer"></div>
-      <div class="console-container" id="console-container">
-        <div class="console-header">Console</div>
-        <div id="console"><span class="dim">Click Run to compile and test your code.</span></div>
-      </div>
-    </div>
-  </div>
+    <section class="right-panel" aria-label="Solution workspace">
+      <section class="editor-container panel" id="editor-container" aria-labelledby="code-tab">
+        <header class="panel-heading">
+          <span class="panel-tab" id="code-tab"><span class="panel-icon" aria-hidden="true">{ }</span>Code</span>
+          <div class="editor-tools">
+            <span class="language-label">CUDA C++</span>
+            <button class="vim-toggle" id="vim-toggle" type="button" aria-pressed="false" title="Enable Vim keybindings">
+              <span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span>
+              <span>Vim</span>
+            </button>
+          </div>
+        </header>
 
-  <!-- Custom modal -->
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal-box">
+        <div id="editor" aria-label="CUDA solution editor"></div>
+
+        <div class="editor-statusbar" aria-live="polite">
+          <span class="vim-status" id="vim-status" hidden>-- NORMAL --</span>
+          <span class="shortcut-hint">Ctrl/Cmd + Enter to run</span>
+          <span class="save-status" id="save-status">Saved locally</span>
+        </div>
+
+        <div class="button-bar">
+          <button class="btn btn-secondary" id="btn-history" type="button" aria-expanded="false" aria-controls="history-panel">History</button>
+          <button class="btn btn-secondary" id="btn-reset" type="button">Reset</button>
+          <span class="button-spacer" aria-hidden="true"></span>
+          <button class="btn btn-run" id="btn-run" type="button">Run</button>
+          <button class="btn btn-submit" id="btn-submit" type="button">Submit</button>
+        </div>
+      </section>
+
+      <div
+        class="v-resizer"
+        id="v-resizer"
+        role="separator"
+        tabindex="0"
+        aria-label="Resize test results"
+        aria-orientation="horizontal"
+        aria-valuemin="15"
+        aria-valuemax="65"
+        aria-valuenow="30"
+      ></div>
+
+      <section class="console-container panel" id="console-container" aria-labelledby="result-tab">
+        <header class="panel-heading">
+          <span class="panel-tab" id="result-tab"><span class="panel-icon" aria-hidden="true">✓</span>Test Result</span>
+        </header>
+        <div id="console" role="status" aria-live="polite" aria-atomic="false">
+          <span class="console-empty"><span class="console-empty-icon" aria-hidden="true">▶</span><span>Run your code to compile it and check the functional tests.</span></span>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="modal-overlay" aria-hidden="true" inert>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-msg">
+      <h2 class="modal-title" id="modal-title">Confirm action</h2>
       <div class="modal-msg" id="modal-msg"></div>
       <div class="modal-actions">
-        <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
-        <button class="modal-btn modal-btn-ok" id="modal-ok">OK</button>
+        <button class="modal-btn modal-btn-cancel" id="modal-cancel" type="button">Cancel</button>
+        <button class="modal-btn modal-btn-ok" id="modal-ok" type="button">Continue</button>
       </div>
     </div>
   </div>
 
-  <!-- History panel -->
-  <div class="history-panel" id="history-panel">
-    <div class="hp-header">
-      <h3>Submission History</h3>
-      <button class="hp-close" onclick="toggleHistory()">&times;</button>
-    </div>
-    <div class="hp-list" id="hp-list"></div>
-  </div>
+  <div class="drawer-scrim" id="drawer-scrim" aria-hidden="true"></div>
+  <aside class="history-panel" id="history-panel" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="history-title" inert>
+    <header class="history-header">
+      <div>
+        <h2 id="history-title">Submission History</h2>
+        <p>Stored locally for this challenge</p>
+      </div>
+      <button class="icon-button" id="history-close" type="button" aria-label="Close submission history">×</button>
+    </header>
+    <div class="history-list" id="history-list"></div>
+  </aside>
 
-  <script>
-    const SLUG = "{{ entry.slug }}";
-
-    // Initialize CodeMirror 5
-    const starterCode = JSON.parse(document.getElementById('starter-code-json').textContent);
-    const savedCode = localStorage.getItem('leetgpu_code_' + SLUG);
-    const cmEditor = CodeMirror(document.getElementById('editor'), {
-      value: savedCode || starterCode,
-      mode: 'text/x-c++src',
-      theme: 'material-darker',
-      lineNumbers: true,
-      matchBrackets: true,
-      autoCloseBrackets: true,
-      indentUnit: 4,
-      tabSize: 4,
-      indentWithTabs: false,
-      extraKeys: { 'Tab': function(cm) { cm.replaceSelection('    ', 'end'); } },
-    });
-    // Save to localStorage on change
-    cmEditor.on('change', () => {
-      localStorage.setItem('leetgpu_code_' + SLUG, cmEditor.getValue());
-    });
-    window.getCode = () => cmEditor.getValue();
-
-    // Auto-render KaTeX
-    document.addEventListener("DOMContentLoaded", () => {
-      if (typeof renderMathInElement === 'function') {
-        renderMathInElement(document.getElementById('desc-panel'), {
-          delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '\\[', right: '\\]', display: true},
-            {left: '\\(', right: '\\)', display: false},
-            {left: '$', right: '$', display: false},
-          ],
-          throwOnError: false,
-        });
-      }
-    });
-
-    // Horizontal resizer (left/right panels)
-    const hResizer = document.getElementById('h-resizer');
-    const descPanel = document.getElementById('desc-panel');
-    let hResizing = false;
-    hResizer.addEventListener('mousedown', () => {
-      hResizing = true;
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    });
-
-    // Vertical resizer (editor/console)
-    const vResizer = document.getElementById('v-resizer');
-    const consoleContainer = document.getElementById('console-container');
-    let vResizing = false;
-    vResizer.addEventListener('mousedown', () => {
-      vResizing = true;
-      document.body.style.cursor = 'row-resize';
-      document.body.style.userSelect = 'none';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-      if (hResizing) {
-        const newWidth = e.clientX;
-        if (newWidth > 200 && newWidth < window.innerWidth - 300) {
-          descPanel.style.width = newWidth + 'px';
-        }
-      }
-      if (vResizing) {
-        const rightPanel = document.querySelector('.right-panel');
-        const rect = rightPanel.getBoundingClientRect();
-        const newConsoleHeight = rect.bottom - e.clientY;
-        if (newConsoleHeight > 60 && newConsoleHeight < rect.height - 100) {
-          consoleContainer.style.height = newConsoleHeight + 'px';
-        }
-      }
-    });
-    document.addEventListener('mouseup', () => {
-      hResizing = false;
-      vResizing = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    });
-
-    // Custom modal (replaces browser confirm)
-    function showModal(msg) {
-      return new Promise((resolve) => {
-        const overlay = document.getElementById('modal-overlay');
-        document.getElementById('modal-msg').textContent = msg;
-        overlay.classList.add('active');
-        const ok = document.getElementById('modal-ok');
-        const cancel = document.getElementById('modal-cancel');
-        function cleanup(result) {
-          overlay.classList.remove('active');
-          ok.replaceWith(ok.cloneNode(true));
-          cancel.replaceWith(cancel.cloneNode(true));
-          resolve(result);
-        }
-        document.getElementById('modal-ok').addEventListener('click', () => cleanup(true));
-        document.getElementById('modal-cancel').addEventListener('click', () => cleanup(false));
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
-      });
-    }
-
-    // Submission history
-    function getHistory() {
-      try { return JSON.parse(localStorage.getItem('leetgpu_history_' + SLUG) || '[]'); }
-      catch { return []; }
-    }
-    function saveHistory(entries) {
-      localStorage.setItem('leetgpu_history_' + SLUG, JSON.stringify(entries));
-    }
-    function addHistoryEntry(code, action, tests, allPassed) {
-      const entries = getHistory();
-      const totalTime = tests.reduce((s, t) => s + (t.time_ms || 0), 0);
-      const perfTest = tests.find(t => t.is_performance);
-      entries.unshift({
-        ts: Date.now(),
-        action: action,
-        code: code,
-        passed: tests.filter(t => t.passed).length,
-        total: tests.length,
-        allPassed: allPassed,
-        totalTimeMs: Math.round(totalTime * 1000) / 1000,
-        perfTimeMs: perfTest ? perfTest.time_ms : null,
-      });
-      if (entries.length > 50) entries.length = 50;
-      saveHistory(entries);
-    }
-
-    function toggleHistory() {
-      const panel = document.getElementById('history-panel');
-      panel.classList.toggle('open');
-      if (panel.classList.contains('open')) renderHistory();
-    }
-
-    function renderHistory() {
-      const list = document.getElementById('hp-list');
-      const entries = getHistory();
-      if (entries.length === 0) {
-        list.innerHTML = '<div class="hp-empty">No submissions yet.<br>Run or Submit your code to see history here.</div>';
-        return;
-      }
-      list.innerHTML = entries.map((e, i) => {
-        const d = new Date(e.ts);
-        const time = d.toLocaleString();
-        const label = e.action === 'submit' ? 'Submit' : 'Run';
-        const cls = e.allPassed ? 'passed' : 'failed';
-        const resultText = e.allPassed ? 'All Passed' : `${e.passed}/${e.total} passed`;
-        const perfInfo = e.perfTimeMs != null ? `<span class="hp-runtime">perf: ${e.perfTimeMs}ms</span>` : '';
-        return `<div class="hp-item">
-          <div class="hp-meta">
-            <span class="hp-time">${esc(time)} (${label})</span>
-            <span class="hp-result ${cls}">${resultText}</span>
-          </div>
-          <div class="hp-stats">
-            <span>Total: ${e.totalTimeMs}ms</span>${perfInfo}
-          </div>
-          <div class="hp-actions">
-            <button class="hp-actions button hp-btn-load" onclick="loadHistoryEntry(${i})">Load Code</button>
-            <button class="hp-actions button hp-btn-del" onclick="deleteHistoryEntry(${i})">Delete</button>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    function loadHistoryEntry(idx) {
-      const entries = getHistory();
-      if (entries[idx]) {
-        cmEditor.setValue(entries[idx].code);
-      }
-    }
-
-    function deleteHistoryEntry(idx) {
-      const entries = getHistory();
-      entries.splice(idx, 1);
-      saveHistory(entries);
-      renderHistory();
-    }
-
-    // Run / Submit
-    async function runCode(action) {
-      const code = window.getCode ? window.getCode() : '';
-      const con = document.getElementById('console');
-      const btnRun = document.getElementById('btn-run');
-      const btnSubmit = document.getElementById('btn-submit');
-
-      btnRun.disabled = true;
-      btnSubmit.disabled = true;
-      con.innerHTML = '<span class="info">Compiling...</span>\n';
-
-      try {
-        const resp = await fetch(`/api/challenges/${SLUG}/${action}`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({code}),
-        });
-        const data = await resp.json();
-
-        if (data.error && !data.compilation) {
-          con.innerHTML += `<span class="fail">Error: ${esc(data.error)}</span>\n`;
-          return;
-        }
-
-        if (!data.compilation.success) {
-          con.innerHTML = '<span class="fail">Compilation FAILED</span>\n\n';
-          con.innerHTML += `<span class="dim">${esc(data.compilation.stderr)}</span>`;
-          return;
-        }
-
-        con.innerHTML = '<span class="pass">Compilation OK</span>\n';
-        if (data.compilation.stderr) {
-          con.innerHTML += `<span class="warn">${esc(data.compilation.stderr)}</span>\n`;
-        }
-
-        if (data.error) {
-          con.innerHTML += `\n<span class="fail">Runtime Error:\n${esc(data.error)}</span>\n`;
-          return;
-        }
-
-        const tests = data.tests || [];
-        const funcTests = tests.filter(t => !t.is_performance);
-        const perfTests = tests.filter(t => t.is_performance);
-
-        if (funcTests.length > 0) {
-          con.innerHTML += `\n<span class="info">Running ${funcTests.length} functional tests...</span>\n`;
-          for (const t of funcTests) {
-            if (t.passed) {
-              con.innerHTML += `  <span class="pass">Test ${t.index}/${tests.length}: PASSED</span> <span class="dim">(${t.time_ms}ms)</span>\n`;
-            } else {
-              con.innerHTML += `  <span class="fail">Test ${t.index}/${tests.length}: FAILED</span>`;
-              if (t.error) con.innerHTML += ` <span class="dim">— ${esc(t.error)}</span>`;
-              con.innerHTML += '\n';
-            }
-          }
-        }
-
-        if (perfTests.length > 0) {
-          con.innerHTML += `\n<span class="info">Running performance test...</span>\n`;
-          for (const t of perfTests) {
-            if (t.passed) {
-              con.innerHTML += `  <span class="pass">Performance: PASSED</span> <span class="dim">(${t.time_ms}ms)</span>\n`;
-            } else {
-              con.innerHTML += `  <span class="fail">Performance: FAILED</span>`;
-              if (t.error) con.innerHTML += ` <span class="dim">— ${esc(t.error)}</span>`;
-              con.innerHTML += '\n';
-            }
-          }
-        }
-
-        const passed = tests.filter(t => t.passed).length;
-        const total = tests.length;
-        const allPassed = data.all_passed;
-        con.innerHTML += `\n<span class="${passed === total ? 'pass' : 'fail'}">Result: ${passed}/${total} tests passed</span>\n`;
-
-        // Save to history (submit only)
-        if (action === 'submit') addHistoryEntry(code, action, tests, allPassed);
-
-        if (action === 'submit' && allPassed) {
-          const save = await showModal('All tests passed! Save solution to disk?');
-          if (save) {
-            const saveResp = await fetch(`/api/challenges/${SLUG}/save`, {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({code}),
-            });
-            const saveData = await saveResp.json();
-            if (saveData.saved) {
-              con.innerHTML += `<span class="pass">Solution saved to ${esc(saveData.saved)}</span>\n`;
-            }
-          }
-        }
-
-      } catch (e) {
-        con.innerHTML += `<span class="fail">Request failed: ${esc(e.message)}</span>\n`;
-      } finally {
-        btnRun.disabled = false;
-        btnSubmit.disabled = false;
-      }
-    }
-
-    async function resetCode() {
-      if (!await showModal('Reset code to starter template?')) return;
-      localStorage.removeItem('leetgpu_code_' + SLUG);
-      cmEditor.setValue(JSON.parse(document.getElementById('starter-code-json').textContent));
-    }
-
-    function esc(s) {
-      const d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
-    }
-  </script>
+  <script src="{{ url_for('static', filename='challenge-ui.js') }}"></script>
 </body>
 </html>
